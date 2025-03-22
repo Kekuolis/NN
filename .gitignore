@@ -1,0 +1,8 @@
+build
+ten
+generate_model
+fftw-3.3.10
+sound
+.vscode
+OpenCNN
+.cache
