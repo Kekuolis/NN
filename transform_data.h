@@ -1,6 +1,6 @@
 #pragma once
 
-#include "information.h"
+#include "wav.h"
 #include <fftw3.h>
 
 struct fftwData{

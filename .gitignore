@@ -6,3 +6,4 @@ sound
 .vscode
 OpenCNN
 .cache
+dynet
