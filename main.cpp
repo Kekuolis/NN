@@ -6,6 +6,13 @@ int main(){
     soundData data = readWav("/home/kek/Documents/rudens/praktika/prof_praktika/lite_project/sound/BabyElephantWalk60.wav");
 
     std::vector<soundData> segments = segment_data(data);
-    learn(segments);
+    SpeachModel model;
+
+    model.learn(segments);
+
+    std::cout<<data.monoSound.size()<<std::endl;
+    std::cout<<model.predictions.size()<<std::endl;
+
+    model.verifyModel(data);
 
 }
