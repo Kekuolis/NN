@@ -2,6 +2,15 @@
 #include "wav.h"
 #include <vector>
 
+template <typename T>
+std::vector<T> realToVec(std::vector<real> &input){
+    std::vector<int> tmp;
+    for (int i = 0; i < input.size(); i++) {
+        tmp.push_back(input[i]);
+    }
+    return tmp;
+}
+
 
 void print_segments(std::vector<soundData> &data) {
 
@@ -24,34 +33,51 @@ void print_segments(std::vector<soundData> &data) {
     }
 
 }
-std::vector<soundData> segment_data(soundData &data) {
-    soundData tmpSegment;
+std::vector<soundData> segment_data(const soundData &data) {
     std::vector<soundData> segments;
-    tmpSegment.headerData = data.headerData;
     int samplesPerMS = (data.headerData.sampleRate / 1000) * 15; // 15ms of sound data from wav
 
-    if (data.headerData.numChannels == 1) {
-        for (int i = 0; i < data.monoSound.size(); i += samplesPerMS) {
-            tmpSegment.monoSound.clear();  // Clear before reuse
+    for (int i = 0; i < data.monoSound.size(); i += samplesPerMS) {
+        soundData tmpSegment;  // Create a new instance
+        tmpSegment.headerData = data.headerData;
 
-            // Prevent out-of-bounds access
-            int endIdx = std::min(i + samplesPerMS, (int)data.monoSound.size());
-            tmpSegment.monoSound.assign(data.monoSound.begin() + i, data.monoSound.begin() + endIdx);
-
-            segments.push_back(tmpSegment);
-        }
-    } else {
-        for (int i = 0; i < data.stereoLeft.size(); i += samplesPerMS) {
-            tmpSegment.stereoLeft.clear();
-            tmpSegment.stereoRight.clear();
-
-            int endIdx = std::min(i + samplesPerMS, (int)data.stereoLeft.size());
-            tmpSegment.stereoLeft.assign(data.stereoLeft.begin() + i, data.stereoLeft.begin() + endIdx);
-            tmpSegment.stereoRight.assign(data.stereoRight.begin() + i, data.stereoRight.begin() + endIdx);
-
-            segments.push_back(tmpSegment);
-        }
+        int endIdx = std::min(i + samplesPerMS, static_cast<int>(data.monoSound.size())); // Ensure we don't go out of bounds
+        tmpSegment.monoSound.insert(tmpSegment.monoSound.end(), 
+                                    data.monoSound.begin() + i, 
+                                    data.monoSound.begin() + endIdx);
+        segments.push_back(std::move(tmpSegment)); // Move instead of copy
     }
-    // print_segments(segments);
     return segments;
 }
+
+std::vector<soundRealDataNoisy> batch_noisy_data(std::string prefix, std::string suffix) {
+    std::string basePath = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
+    std::vector<soundData> segementedNoisyData;
+    std::vector<soundRealDataNoisy> tmp;
+    
+    // std::vector<soundRealData> tmp;
+
+    // Loop over a range of dB values, here from 10 to 20 with a step of 5.
+    int j = 0; // index for segementedNoisyData 
+    for (int db = 10; db <= 35; db += 5) {
+        std::stringstream filePath;
+        soundRealDataNoisy segNs;
+        filePath << basePath << prefix << db << suffix;
+        std::string path = filePath.str();
+        segementedNoisyData = segment_data(readWav(path));
+        for (int i = 0; i < segementedNoisyData.size(); i++) {
+            segNs.noisySound = vecToReal<int>(segementedNoisyData[i].monoSound);
+            tmp.push_back(segNs);
+        }
+        j++;
+        // segNs.noisySound = vecToReal(segementedNoisyData[i].monoSound);
+        std::cout << path << std::endl;
+    }
+
+    return tmp;
+}
+
+// čia turi vektorių soundData, nešvarių garsų tada iš šio vektoriaus
+// reikia patalpinti duomenis į soundRealData struktūrą kad turėčiau vektorius švarių ir nešvarių garsų
+// bet soundRealData jau yra segemntų struktūra
+// todėl reikia vektorį soundData išskalidyti į mažus soundRealData vektorius kurie turės savo vektorius duomenų

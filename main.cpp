@@ -1,48 +1,62 @@
 #include "wav.h"
 #include "cnn.h"
 #include "segment_data.h"
+#include <iostream>
+#include <vector>
 
-std::vector<real> vecToReal(std::vector<int> &input){
-    std::vector<real> tmp;
-    for (int i = 0; i < input.size(); i++) {
-        tmp.push_back(input[i]);
-    }
-    return tmp;
-}
-std::vector<int> realToVec(std::vector<real> &input){
-    std::vector<int> tmp;
-    for (int i = 0; i < input.size(); i++) {
-        tmp.push_back(input[i]);
-    }
-    return tmp;
-}
 
 int main(int argc, char** argv){
     dynet::initialize(argc, argv);
-
-    soundData dataNoisy = readWav("/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/L_RA_M4_01_10dB.wav");
-    soundData dataClean = readWav("/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/L_RA_M4_01.wav");
-
-
-    std::vector<soundData> segmentsClean = segment_data(dataClean);
-    std::vector<soundData> segmentsNoisy = segment_data(dataNoisy);
+    std::string path = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
 
     ParameterCollection pc;
-    SpeechDenoisingModel model(pc, dataNoisy);
-    std::vector<soundRealData> training_data;
+    SpeechDenoisingModel model(pc);
 
+    std::vector<soundRealDataClean> trainingDataClean;
+    std::vector<soundRealDataNoisy> trainingDataNoisy; 
 
-    // problem nr1 this pushes back both vectors of clean and unclean data for some reason?
-    // problem nr2 how are the values remembered across the epochs?
-    // problem nr3 why would i rebuild the graph every time?
-    // problem nr3 why would i rebuild the graph every time?
+    std::string cleanDataPaths[8] = {"L_RA_M4_01.wav", "L_RA_M4_02.wav", "L_RA_M5_01.wav",
+         "L_RA_M5_02.wav", "R_RD_F3_01.wav", 
+        "R_RD_M4_01.wav",
+        "R_RD_F3_02.wav", "R_RD_F3_03.wav",
+    };
+    std::string noisyDataPathsPrefix[8] = {"L_RA_M4_01_", "L_RA_M4_02_",
+         "L_RA_M5_01_", "L_RA_M5_02_",
+         "R_RD_F3_01_", "R_RD_M4_01_",
+          "R_RD_F3_02_", "R_RD_F3_03_"};
 
-    for (int i = 0; i < segmentsClean.size(); i++) {
-        soundRealData seg;
-        
-        seg.cleanSound = vecToReal(segmentsClean[i].monoSound);
-        seg.noisySound = vecToReal(segmentsNoisy[i].monoSound);
-        training_data.push_back(seg);
+    auto start = std::chrono::high_resolution_clock::now();
+
+    // Load and prepare all clean and noisy data
+    for (int i = 0; i < sizeof(cleanDataPaths) / sizeof(cleanDataPaths[0]); i++) {  // Loop over all files
+        std::string clean_path = path + cleanDataPaths[i];
+        soundData dataClean = readWav(clean_path);
+        std::vector<soundData> segmentsClean = segment_data(dataClean);
+
+        for (const auto& seg : segmentsClean) {
+            soundRealDataClean segCl;
+            segCl.cleanSound = vecToReal<int>(seg.monoSound);
+            trainingDataClean.push_back(segCl);
+        }
+        std::vector<soundRealDataNoisy> tmp = batch_noisy_data(noisyDataPathsPrefix[i]);
+        for (soundRealDataNoisy i : tmp) {
+            trainingDataNoisy.push_back(i);
+        }
+        std::cout<< "tmp size: " << tmp.size() << std::endl;
+
     }
-    model.train(training_data, pc, 1000, 0.001);
+    std::cout<< "trainingDataNoisy size: " << trainingDataNoisy.size() << std::endl;
+
+    
+    model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, 6, 1);
+
+    // Save the model after training.
+    TextFileSaver saver("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/params.model");
+    saver.save(pc);
+    
+    auto end = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> duration = end - start;
+    std::cout << "Training time: " << duration.count() << " seconds" << std::endl;
+
+    return 0;
 }
