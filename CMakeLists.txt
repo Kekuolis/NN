@@ -12,7 +12,7 @@ include_directories(
 )
 
 
-add_executable(my_project main.cpp cnn.cpp wav.cpp transform_data.cpp segment_data.cpp)
+add_executable(my_project main.cpp wav.cpp transform_data.cpp segment_data.cpp load_model.cpp)
 
 link_directories(/usr/lib)
 

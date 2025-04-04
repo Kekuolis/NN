@@ -3,7 +3,7 @@
 #include "segment_data.h"
 #include <iostream>
 #include <vector>
-
+#include "load_model.h"
 
 int main(int argc, char** argv){
     dynet::initialize(argc, argv);
@@ -45,6 +45,11 @@ int main(int argc, char** argv){
         std::cout<< "tmp size: " << tmp.size() << std::endl;
 
     }
+
+    if (false) {
+        load_model(trainingDataNoisy);
+
+    }
     std::cout<< "trainingDataNoisy size: " << trainingDataNoisy.size() << std::endl;
 
     
@@ -57,6 +62,6 @@ int main(int argc, char** argv){
     auto end = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> duration = end - start;
     std::cout << "Training time: " << duration.count() << " seconds" << std::endl;
-
+   
     return 0;
 }

@@ -11,7 +11,6 @@ std::vector<T> realToVec(std::vector<real> &input){
     return tmp;
 }
 
-
 void print_segments(std::vector<soundData> &data) {
 
     for (int i = 0; i < data.size(); i++) {
@@ -33,9 +32,10 @@ void print_segments(std::vector<soundData> &data) {
     }
 
 }
+
 std::vector<soundData> segment_data(const soundData &data) {
     std::vector<soundData> segments;
-    int samplesPerMS = (data.headerData.sampleRate / 1000) * 15; // 15ms of sound data from wav
+    int samplesPerMS = (data.headerData.sampleRate / 1000) * 20; // 15ms of sound data from wav
 
     for (int i = 0; i < data.monoSound.size(); i += samplesPerMS) {
         soundData tmpSegment;  // Create a new instance
