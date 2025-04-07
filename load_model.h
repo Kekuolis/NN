@@ -14,4 +14,4 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/program_options.hpp>
 
-void load_model(std::vector<soundRealDataNoisy> data);
+void load_model(std::vector<soundRealDataNoisy> data, uint batch_size = 8, std::string filepath = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/L_RA_M4_01_10dB.wav");

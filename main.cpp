@@ -5,12 +5,21 @@
 #include <vector>
 #include "load_model.h"
 
+// need to fix clean data mapping, this kinda works?
+// so what the  do i do here?
+// 
+// make dynamic file loading - this is for the end of the project
+// create a function to output clean sound files - i want to do this now.
+// write a function that can consume params only and run the model on data
+// write the report - lol
+
+
 int main(int argc, char** argv){
     dynet::initialize(argc, argv);
     std::string path = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
 
     ParameterCollection pc;
-    SpeechDenoisingModel model(pc);
+    Speech_Denoising_Model model(pc);
 
     std::vector<soundRealDataClean> trainingDataClean;
     std::vector<soundRealDataNoisy> trainingDataNoisy; 
@@ -25,17 +34,16 @@ int main(int argc, char** argv){
          "R_RD_F3_01_", "R_RD_M4_01_",
           "R_RD_F3_02_", "R_RD_F3_03_"};
 
-    auto start = std::chrono::high_resolution_clock::now();
 
     // Load and prepare all clean and noisy data
     for (int i = 0; i < sizeof(cleanDataPaths) / sizeof(cleanDataPaths[0]); i++) {  // Loop over all files
-        std::string clean_path = path + cleanDataPaths[i];
+        std::string clean_path = path + cleanDataPaths[i];    // Load and prepare all clean and noisy data
         soundData dataClean = readWav(clean_path);
         std::vector<soundData> segmentsClean = segment_data(dataClean);
 
         for (const auto& seg : segmentsClean) {
             soundRealDataClean segCl;
-            segCl.cleanSound = vecToReal<int>(seg.monoSound);
+            segCl.clean_sound = vecToReal<int>(seg.monoSound);
             trainingDataClean.push_back(segCl);
         }
         std::vector<soundRealDataNoisy> tmp = batch_noisy_data(noisyDataPathsPrefix[i]);
@@ -43,17 +51,18 @@ int main(int argc, char** argv){
             trainingDataNoisy.push_back(i);
         }
         std::cout<< "tmp size: " << tmp.size() << std::endl;
-
     }
+    uint batch_size = 1;
 
-    if (false) {
-        load_model(trainingDataNoisy);
-
+    if (true) {
+        load_model(trainingDataNoisy, batch_size, "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/L_RA_M4_01_10dB.wav");
+        return 0;
     }
     std::cout<< "trainingDataNoisy size: " << trainingDataNoisy.size() << std::endl;
 
     
-    model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, 6, 1);
+    auto start = std::chrono::high_resolution_clock::now();
+    model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, batch_size);
 
     // Save the model after training.
     TextFileSaver saver("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/params.model");

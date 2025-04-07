@@ -1,33 +1,71 @@
 #include "load_model.h"
+#include "cnn.h"
+#include "dynet/io.h"
+#include "dynet/model.h"
+#include <vector>
 
 using namespace dynet;
 
-void load_model(std::vector<soundRealDataNoisy> data) {
-  // (1) Re-create your model: add parameters with the same dimensions
-  ParameterCollection model;
-  model.add_parameters({6});
-  Parameter a,b,c,d,e,f;
+#include <fstream>
+#include <vector>
+#include <iostream>
 
-  LookupParameter l_param;
-  {
-    TextFileLoader loader("./param/params.model");
-    a = loader.load_param(model, "/_0");
-    b = loader.load_param(model, "/_1");
-    c = loader.load_param(model, "/_2");
-    d = loader.load_param(model, "/_3");
-    e = loader.load_param(model, "/_4");
-    f = loader.load_param(model, "/_5");
-    f = loader.load_param(model, "/_6");
+void writeWavFile(const std::string& filename, const soundData& sound) {
+    const header& hdr = sound.headerData;
+    std::ofstream outFile(filename, std::ios::binary);
+    
+    if (!outFile) {
+        std::cerr << "Failed to open file for writing: " << filename << "\n";
+        return;
+    }
+
+    // Write WAV header
+    outFile.write(hdr.riffHeader, 4);
+    outFile.write(reinterpret_cast<const char*>(&hdr.wavSize), sizeof(hdr.wavSize));
+    outFile.write(hdr.waveHeader, 4);
+    outFile.write(hdr.fmtHeader, 4);
+    outFile.write(reinterpret_cast<const char*>(&hdr.fmtChunkSize), sizeof(hdr.fmtChunkSize));
+    outFile.write(reinterpret_cast<const char*>(&hdr.audioFormat), sizeof(hdr.audioFormat));
+    outFile.write(reinterpret_cast<const char*>(&hdr.numChannels), sizeof(hdr.numChannels));
+    outFile.write(reinterpret_cast<const char*>(&hdr.sampleRate), sizeof(hdr.sampleRate));
+    outFile.write(reinterpret_cast<const char*>(&hdr.byteRate), sizeof(hdr.byteRate));
+    outFile.write(reinterpret_cast<const char*>(&hdr.blockAlign), sizeof(hdr.blockAlign));
+    outFile.write(reinterpret_cast<const char*>(&hdr.bitsPerSample), sizeof(hdr.bitsPerSample));
+    outFile.write(hdr.dataHeader, 4);
+    outFile.write(reinterpret_cast<const char*>(&hdr.dataSize), sizeof(hdr.dataSize));
+
+    // Write audio data
+    if (hdr.numChannels == 1) {
+        // Mono
+        for (int sample : sound.monoSound) {
+            short s = static_cast<short>(sample);
+            outFile.write(reinterpret_cast<const char*>(&s), sizeof(short));
+        }
+    } else {
+        std::cerr << "Unsupported number of channels: " << hdr.numChannels << "\n";
+    }
+
+    outFile.close();
+    std::cout << "WAV file written to: " << filename << "\n";
+}
+
+
+void load_model(std::vector<soundRealDataNoisy> data, uint batch_size, std::string filepath) {
+  // (1) Re-create your parameter collection: add parameters with the same dimensions
+  ParameterCollection pc;
+  pc.add_parameters({2});
+  std::vector<Parameter> parameters;
+  Parameter tmp;
+  LookupParameter l_param;{
+    TextFileLoader loader("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/params.model");
+    parameters.push_back(loader.load_param(pc, "/_0"));
+    parameters.push_back(loader.load_param(pc, "/_1"));
   }
-  ComputationGraph cg;
 
-  Expression A = parameter(cg, a);
-  Expression B = parameter(cg, b);
-  Expression C = parameter(cg, c);
-  Expression D = parameter(cg, d);
-  Expression E = parameter(cg, e);
-  Expression F = parameter(cg, f);
+  Speech_Denoising_Model loaded_params(pc);
+  soundData outputFile = loaded_params.use_model(pc,parameters, filepath, batch_size);
   
+  writeWavFile("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/output_file.wav", outputFile);
   // std::vector<float> denoised_output;
 
   // for (const auto& segment : data) {

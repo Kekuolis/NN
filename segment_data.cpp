@@ -3,7 +3,7 @@
 #include <vector>
 
 template <typename T>
-std::vector<T> realToVec(std::vector<real> &input){
+std::vector<T> realToVec(std::vector<dynet::real> &input){
     std::vector<int> tmp;
     for (int i = 0; i < input.size(); i++) {
         tmp.push_back(input[i]);
@@ -66,7 +66,7 @@ std::vector<soundRealDataNoisy> batch_noisy_data(std::string prefix, std::string
         std::string path = filePath.str();
         segementedNoisyData = segment_data(readWav(path));
         for (int i = 0; i < segementedNoisyData.size(); i++) {
-            segNs.noisySound = vecToReal<int>(segementedNoisyData[i].monoSound);
+            segNs.noisy_sound = vecToReal<int>(segementedNoisyData[i].monoSound);
             tmp.push_back(segNs);
         }
         j++;

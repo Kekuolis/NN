@@ -36,10 +36,10 @@ soundData readWav(std::string pathToFile) {
         throw std::runtime_error("Failed to read the header properly.");
 
     // Display header information (example)
-    // std::cout << "Channels: " << header.numChannels << std::endl;
-    // std::cout << "Sample Rate: " << header.sampleRate << std::endl;
-    // std::cout << "Bits Per Sample: " << header.bitsPerSample << std::endl;
-    // std::cout << "Data size: " << header.dataSize << std::endl;
+    std::cout << "Channels: " << header.numChannels << std::endl;
+    std::cout << "Sample Rate: " << header.sampleRate << std::endl;
+    std::cout << "Bits Per Sample: " << header.bitsPerSample << std::endl;
+    std::cout << "Data size: " << header.dataSize << std::endl;
 
     // Buffer for reading data
     const uint16_t bufferSize = 4096;
