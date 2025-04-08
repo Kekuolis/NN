@@ -216,7 +216,7 @@ public:
 private:
   Parameter p_conv;
   Parameter p_reconstruct;
-  VanillaLSTMBuilder builder;
+  // VanillaLSTMBuilder builder;
   std::vector<int> outputSound;
   bool save;
 };

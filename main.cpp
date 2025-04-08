@@ -5,12 +5,18 @@
 #include <iostream>
 #include <vector>
 #include "load_files.h"
-// need to fix clean data mapping, this kinda works?
-// so what the  do i do here?
-//
-// make dynamic file loading - this is for the end of the project
-// create a function to output clean sound files - i want to do this now.
-// write a function that can consume params only and run the model on data
+// Model works
+// Loading params works
+// Added dynamic file loading
+// conversion back to sound file works
+// 
+// I can add more layers
+// I can add more filters
+// I can add more parameters
+// I can add multithreading???
+// I can add loss output
+// I can add 
+// 
 // write the report - lol
 #include <chrono>
 #include <filesystem>
@@ -32,16 +38,28 @@ int main(int argc, char **argv) {
 
   ParameterCollection pc;
   Speech_Denoising_Model model(pc);
+  
+  const uint32_t batchSize = 1;
+  if (true) {
+  // Re-create your parameter collection: add parameters with the same dimensions
+
+    ParameterCollection pc;
+    pc.add_parameters({2});
+    std::vector<Parameter> parameters;
+    Parameter tmp;
+    LookupParameter l_param;{ // load model params
+      TextFileLoader loader("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/params.model");
+      parameters.push_back(loader.load_param(pc, "/_0"));
+      parameters.push_back(loader.load_param(pc, "/_1"));
+    }
+    // evaluate_model(pc, parameters, batchSize, testWavPath);
+    return 0;
+  }
 
   std::vector<SoundRealDataClean> trainingDataClean = load_files<CleanTag>();
   std::vector<SoundRealDataNoisy> trainingDataNoisy = load_files<NoisyTag>(false, std::regex(R"([LR]_[A-Z]{2}_[FM]\d+_[A-Z]{2}\d{3}_a\d{4}_\d+db\.wav)"));
 
-  const uint32_t batchSize = 1;
   // Check for training/using the trained models params for audio output
-  if (true) {
-    load_model(batchSize, testWavPath);
-    return 0;
-  }
 
   std::cout << "Total noisy training segments: " << trainingDataNoisy.size()
             << std::endl;

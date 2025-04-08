@@ -14,7 +14,6 @@
 
 namespace fs = std::filesystem;
 
-
 std::vector<std::string>
 get_matched_file_paths(const std::string &basePath,
                        const std::regex &regexPattern) {
@@ -67,9 +66,6 @@ load_files(bool clean_or_noisy,
   if (clean_or_noisy) {
     const std::string base_path = "/home/kek/Documents/rudens/praktika/"
                                   "prof_praktika/network/irasai/TRAIN/";
-
-    // Match filenames like *_*_DK015_a0245.wav, more generally:
-    // anything_aXXXX.wav
 
     std::vector<std::string> clean_data_paths;
 
