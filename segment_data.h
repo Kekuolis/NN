@@ -4,14 +4,13 @@
 #include "dynet/tensor.h"
 
 
-struct soundRealDataClean {
-    std::vector<dynet::real> clean_sound;
+template <typename SoundType>
+struct SoundRealData {
+    std::vector<dynet::real> sound;
     std::vector<dynet::real> file_number;
 };
-struct soundRealDataNoisy {
-std::vector<dynet::real> noisy_sound;
-std::vector<dynet::real> file_number;
-};
+using SoundRealDataClean = SoundRealData<struct CleanTag>;
+using SoundRealDataNoisy = SoundRealData<struct NoisyTag>;
 
 std::vector<soundData> segment_data(const soundData &data);
 
@@ -28,4 +27,5 @@ std::vector<dynet::real> vecToReal(const std::vector<T> &input) {
 }
 template <typename T>
 std::vector<T> realToVec(std::vector<dynet::real> &input);
-std::vector<soundRealDataNoisy> batch_noisy_data(std::string prefix = "L_RA_M4_01_", std::string suffix = "dB.wav");
+template <typename T>
+std::vector<T> batch_noisy_data(std::string prefix = "L_RA_M4_01_", std::string suffix = "dB.wav");

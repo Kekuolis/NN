@@ -4,7 +4,7 @@
 #include "wav.h"
 #include <iostream>
 #include <vector>
-
+#include "load_files.h"
 // need to fix clean data mapping, this kinda works?
 // so what the  do i do here?
 //
@@ -33,53 +33,13 @@ int main(int argc, char **argv) {
   ParameterCollection pc;
   Speech_Denoising_Model model(pc);
 
-  std::vector<soundRealDataClean> trainingDataClean;
-  std::vector<soundRealDataNoisy> trainingDataNoisy;
-
-  const std::vector<std::string> cleanDataPaths = {
-      "L_RA_M4_01.wav", "L_RA_M4_02.wav", "L_RA_M5_01.wav", "L_RA_M5_02.wav",
-      "R_RD_F3_01.wav", "R_RD_M4_01.wav", "R_RD_F3_02.wav", "R_RD_F3_03.wav"};
-
-  const std::vector<std::string> noisyDataPrefixes = {
-      "L_RA_M4_01_", "L_RA_M4_02_", "L_RA_M5_01_", "L_RA_M5_02_",
-      "R_RD_F3_01_", "R_RD_M4_01_", "R_RD_F3_02_", "R_RD_F3_03_"};
-
-  if (cleanDataPaths.size() != noisyDataPrefixes.size()) {
-    std::cerr << "Mismatch between clean and noisy data paths!" << std::endl;
-    return 1;
-  }
-
-  for (size_t i = 0; i < cleanDataPaths.size(); ++i) {
-    const std::string cleanFilePath = basePath + cleanDataPaths[i];
-
-    if (!std::filesystem::exists(cleanFilePath)) {
-      std::cerr << "File not found: " << cleanFilePath << std::endl;
-      continue;
-    }
-
-    soundData dataClean = readWav(cleanFilePath);
-    std::vector<soundData> segmentsClean = segment_data(dataClean);
-
-    for (const auto &segment : segmentsClean) {
-      soundRealDataClean cleanSegment;
-      cleanSegment.clean_sound = vecToReal<int>(segment.monoSound);
-      trainingDataClean.push_back(std::move(cleanSegment));
-    }
-
-    std::vector<soundRealDataNoisy> noisySegments =
-        batch_noisy_data(noisyDataPrefixes[i]);
-    trainingDataNoisy.insert(trainingDataNoisy.end(),
-                             std::make_move_iterator(noisySegments.begin()),
-                             std::make_move_iterator(noisySegments.end()));
-
-    std::cout << "Loaded " << noisySegments.size()
-              << " noisy segments for: " << noisyDataPrefixes[i] << std::endl;
-  }
+  std::vector<SoundRealDataClean> trainingDataClean = load_files<CleanTag>();
+  std::vector<SoundRealDataNoisy> trainingDataNoisy = load_files<NoisyTag>(false, std::regex(R"([LR]_[A-Z]{2}_[FM]\d+_[A-Z]{2}\d{3}_a\d{4}_\d+db\.wav)"));
 
   const uint32_t batchSize = 1;
-
-  if (false) {
-    load_model(trainingDataNoisy, batchSize, testWavPath);
+  // Check for training/using the trained models params for audio output
+  if (true) {
+    load_model(batchSize, testWavPath);
     return 0;
   }
 
@@ -87,7 +47,7 @@ int main(int argc, char **argv) {
             << std::endl;
 
   const auto startTime = std::chrono::high_resolution_clock::now();
-  model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, batchSize);
+  model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, batchSize, 8);
   const auto endTime = std::chrono::high_resolution_clock::now();
 
   TextFileSaver saver(modelSavePath);

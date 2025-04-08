@@ -50,10 +50,10 @@ std::vector<soundData> segment_data(const soundData &data) {
     return segments;
 }
 
-std::vector<soundRealDataNoisy> batch_noisy_data(std::string prefix, std::string suffix) {
+std::vector<SoundRealDataNoisy> batch_noisy_data(std::string prefix, std::string suffix) {
     std::string basePath = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
     std::vector<soundData> segementedNoisyData;
-    std::vector<soundRealDataNoisy> tmp;
+    std::vector<SoundRealDataNoisy> tmp;
     
     // std::vector<soundRealData> tmp;
 
@@ -61,12 +61,12 @@ std::vector<soundRealDataNoisy> batch_noisy_data(std::string prefix, std::string
     int j = 0; // index for segementedNoisyData 
     for (int db = 10; db <= 35; db += 5) {
         std::stringstream filePath;
-        soundRealDataNoisy segNs;
+        SoundRealDataNoisy segNs;
         filePath << basePath << prefix << db << suffix;
         std::string path = filePath.str();
         segementedNoisyData = segment_data(readWav(path));
         for (int i = 0; i < segementedNoisyData.size(); i++) {
-            segNs.noisy_sound = vecToReal<int>(segementedNoisyData[i].monoSound);
+            segNs.sound = vecToReal<int>(segementedNoisyData[i].monoSound);
             tmp.push_back(segNs);
         }
         j++;

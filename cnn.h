@@ -105,10 +105,10 @@ public:
   }
 
   // Train the model over multiple epochs using the provided training segments.
-  void train(const std::vector<soundRealDataNoisy> &dataSegmentsNoisy,
-             const std::vector<soundRealDataClean> &dataSegmentsClean,
+  void train(const std::vector<SoundRealDataNoisy> &dataSegmentsNoisy,
+             const std::vector<SoundRealDataClean> &dataSegmentsClean,
              ParameterCollection &pc, float learning_rate = 0.01,
-             unsigned batch_size = 8, int noisy_data_file_count = 6) {
+             unsigned batch_size = 8, int noisy_data_file_count = 8) {
 
     if (dataSegmentsNoisy.empty() || dataSegmentsClean.empty()) {
       std::cerr << "Training data is empty." << std::endl;
@@ -129,13 +129,13 @@ public:
     std::cout << "Clean batch size: " << num_clean_segments << std::endl;
 
     if (!dataSegmentsNoisy.empty() &&
-        !dataSegmentsNoisy.back().noisy_sound.empty())
+        !dataSegmentsNoisy.back().sound.empty())
       std::cout << "Single Noisy batch size: "
-                << dataSegmentsNoisy.back().noisy_sound.size() << std::endl;
+                << dataSegmentsNoisy.back().sound.size() << std::endl;
     if (!dataSegmentsClean.empty() &&
-        !dataSegmentsClean.back().clean_sound.empty())
+        !dataSegmentsClean.back().sound.empty())
       std::cout << "Single Clean batch size: "
-                << dataSegmentsClean.back().clean_sound.size() << std::endl;
+                << dataSegmentsClean.back().sound.size() << std::endl;
 
     // Process training mini-batches.
     for (size_t seg_start = 0; seg_start < num_segments;
@@ -150,8 +150,8 @@ public:
       // Collect noisy data for the batch.
       for (size_t seg = seg_start; seg < seg_end; ++seg) {
         noisy_batch.insert(noisy_batch.end(),
-                           dataSegmentsNoisy[seg].noisy_sound.begin(),
-                           dataSegmentsNoisy[seg].noisy_sound.end());
+                           dataSegmentsNoisy[seg].sound.begin(),
+                           dataSegmentsNoisy[seg].sound.end());
         ++current_batch_size;
       }
 
@@ -164,8 +164,8 @@ public:
           continue; // Skip if out-of-bounds.
         }
         clean_batch.insert(clean_batch.end(),
-                           dataSegmentsClean[clean_index].clean_sound.begin(),
-                           dataSegmentsClean[clean_index].clean_sound.end());
+                           dataSegmentsClean[clean_index].sound.begin(),
+                           dataSegmentsClean[clean_index].sound.end());
       }
 
       // Ensure both batches have the same size.

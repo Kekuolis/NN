@@ -50,7 +50,7 @@ void writeWavFile(const std::string& filename, const soundData& sound) {
 }
 
 
-void load_model(std::vector<soundRealDataNoisy> data, uint batch_size, std::string filepath) {
+void load_model(uint batch_size, std::string filepath) {
   // (1) Re-create your parameter collection: add parameters with the same dimensions
   ParameterCollection pc;
   pc.add_parameters({2});
