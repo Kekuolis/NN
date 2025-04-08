@@ -127,7 +127,7 @@ public:
               << num_segments / static_cast<size_t>(noisy_data_file_count)
               << std::endl;
     std::cout << "Clean batch size: " << num_clean_segments << std::endl;
-
+    // this means nothing as the batch changes
     if (!dataSegmentsNoisy.empty() &&
         !dataSegmentsNoisy.back().sound.empty())
       std::cout << "Single Noisy batch size: "

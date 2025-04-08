@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
   Speech_Denoising_Model model(pc);
   
   const uint32_t batchSize = 1;
-  if (true) {
+  if (false) {
   // Re-create your parameter collection: add parameters with the same dimensions
 
     ParameterCollection pc;
