@@ -51,7 +51,7 @@ std::vector<soundData> segment_data(const soundData &data) {
 }
 
 std::vector<SoundRealDataNoisy> batch_noisy_data(std::string prefix, std::string suffix) {
-    std::string basePath = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
+    std::string base_path = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/";
     std::vector<soundData> segementedNoisyData;
     std::vector<SoundRealDataNoisy> tmp;
     
@@ -59,10 +59,10 @@ std::vector<SoundRealDataNoisy> batch_noisy_data(std::string prefix, std::string
 
     // Loop over a range of dB values, here from 10 to 20 with a step of 5.
     int j = 0; // index for segementedNoisyData 
-    for (int db = 10; db <= 35; db += 5) {
+    for (int db = 5; db <= 40; db += 5) {
         std::stringstream filePath;
         SoundRealDataNoisy segNs;
-        filePath << basePath << prefix << db << suffix;
+        filePath << base_path << prefix << db << suffix;
         std::string path = filePath.str();
         segementedNoisyData = segment_data(readWav(path));
         for (int i = 0; i < segementedNoisyData.size(); i++) {
@@ -76,8 +76,3 @@ std::vector<SoundRealDataNoisy> batch_noisy_data(std::string prefix, std::string
 
     return tmp;
 }
-
-// čia turi vektorių soundData, nešvarių garsų tada iš šio vektoriaus
-// reikia patalpinti duomenis į soundRealData struktūrą kad turėčiau vektorius švarių ir nešvarių garsų
-// bet soundRealData jau yra segemntų struktūra
-// todėl reikia vektorį soundData išskalidyti į mažus soundRealData vektorius kurie turės savo vektorius duomenų

@@ -38,8 +38,6 @@ struct soundData {
     std::vector<int> monoSound;
     std::vector<int> stereoLeft;
     std::vector<int> stereoRight;
-    size_t audioPosition = 0;  // Track playback position
-    size_t finished = false;  // Track playback position
 };
 
 std::string getPath();

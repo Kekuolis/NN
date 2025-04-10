@@ -8,3 +8,7 @@ std::vector<SoundRealData<T>>
     std::regex pattern = std::regex(R"(^.+_.+_.+_.+_a\d{4}\.wav$)"));
 
 std::vector<SoundRealDataNoisy> load_single_file(std::string path);
+
+std::vector<std::string>
+   get_matched_file_paths(const std::string &basePath,
+                          const std::regex &regexPattern);

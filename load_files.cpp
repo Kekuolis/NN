@@ -1,4 +1,5 @@
 #include "load_files.h"
+#include "cnn.h"
 #include "segment_data.h"
 
 #include <filesystem>
@@ -11,6 +12,8 @@
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "wav.h"
 
 namespace fs = std::filesystem;
 
@@ -58,7 +61,7 @@ get_matched_file_paths(const std::string &basePath,
             << std::endl;
   return matched_paths;
 }
-
+// This is a load files for training function
 template <typename T>
 std::vector<SoundRealData<T>> load_files(bool clean_or_noisy,
                                          std::regex pattern) {
@@ -110,14 +113,14 @@ template std::vector<SoundRealData<CleanTag>> load_files<CleanTag>(bool,
 
 std::vector<SoundRealDataNoisy> load_single_file(std::string path) {
 
-  std::vector<SoundRealDataNoisy> training_data_noisy;
+  std::vector<SoundRealDataNoisy> tmp;
 
   soundData data_noisy = readWav(path);
   std::vector<soundData> segments_noisy = segment_data(data_noisy);
   for (const auto &segment : segments_noisy) {
     SoundRealDataNoisy noisy_segment;
     noisy_segment.sound = vecToReal<int>(segment.monoSound);
-    training_data_noisy.push_back(std::move(noisy_segment));
+    tmp.push_back(std::move(noisy_segment));
   }
-  return training_data_noisy;
+  return tmp;
 }

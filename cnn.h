@@ -18,6 +18,7 @@
 #include <dynet/expr.h>
 #include <dynet/lstm.h>
 
+
 #include "segment_data.h"
 #include "wav.h"
 

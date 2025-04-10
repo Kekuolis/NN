@@ -1,4 +1,5 @@
 #include "load_model.h"
+#include "load_files.h"
 #include "cnn.h"
 #include "dynet/io.h"
 #include "dynet/model.h"
@@ -67,3 +68,26 @@ void load_model(uint batch_size, std::string filepath) {
   
   writeWavFile("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/output_file.wav", outputFile);
 }
+
+void generate_denoised_files(std::regex reg_noisy,  const std::string base_path, uint batch_size) {
+    std::vector<std::string> paths_noisy = get_matched_file_paths(base_path, reg_noisy);
+  
+  
+    ParameterCollection pc;
+      pc.add_parameters({2});
+      std::vector<Parameter> parameters;
+      LookupParameter l_param;{ // load model params
+        TextFileLoader loader("/home/kek/Documents/rudens/praktika/prof_praktika/network/param/params.model");
+        parameters.push_back(loader.load_param(pc, "/_0"));
+        parameters.push_back(loader.load_param(pc, "/_1"));
+    }
+    Speech_Denoising_Model use_model(pc);
+    for (int i =0; i < paths_noisy.size(); i++) {
+      std::cout << "Processing file: " << paths_noisy[i] << std::endl;
+      soundData tmp = use_model.use_model(pc,parameters, paths_noisy[i], batch_size);
+      std::filesystem::path p( paths_noisy[i]);
+
+      writeWavFile("/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/TEST/DENOISED/" + p.filename().string(), tmp);
+    }
+    
+  }
