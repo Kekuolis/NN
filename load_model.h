@@ -17,7 +17,6 @@
 
 // std::string noisy_training_data_location =  "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/TRAIN/noisy/";
 
-void load_model(uint batch_size = 8, std::string filepath = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/L_RA_M4_01_10dB.wav");
 void generate_denoised_files(
     std::regex reg_noisy = std::regex(R"([LR]_[A-Z]{2}_[FM]\d+_[A-Z]{2}\d{3}_a\d{4}_\d+db\.wav)"),
     const std::string base_path = "/home/kek/Documents/rudens/praktika/prof_praktika/network/irasai/TRAIN/noisy/",

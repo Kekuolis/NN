@@ -5,12 +5,12 @@ project(my_project)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BUILD_TYPE Debug)
 
 include_directories(
     /usr/include/
     ${CMAKE_SOURCE_DIR}/dynet
 )
-
 
 add_executable(my_project main.cpp wav.cpp transform_data.cpp segment_data.cpp load_model.cpp load_files.cpp)
 
