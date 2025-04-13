@@ -64,11 +64,15 @@ std::vector<SoundRealDataNoisy> batch_noisy_data(std::string prefix, std::string
         SoundRealDataNoisy segNs;
         filePath << base_path << prefix << db << suffix;
         std::string path = filePath.str();
-        segementedNoisyData = segment_data(readWav(path));
+        soundData data = readWav(path);
+        segementedNoisyData = segment_data(data);
+        segNs.file_segment_count = segementedNoisyData.size();
         for (int i = 0; i < segementedNoisyData.size(); i++) {
             segNs.sound = vecToReal<int>(segementedNoisyData[i].monoSound);
             tmp.push_back(segNs);
+            tmp[j].file_segment_count = data.monoSound.size() / segementedNoisyData.size();
         }
+
         j++;
         // segNs.noisySound = vecToReal(segementedNoisyData[i].monoSound);
         std::cout << path << std::endl;

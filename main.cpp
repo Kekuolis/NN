@@ -27,8 +27,6 @@
 #include <string>
 #include <vector>
 
-// Add necessary includes for dynet and your custom headers
-
 int main(int argc, char **argv) {
   dynet::initialize(argc, argv);
 
@@ -61,18 +59,31 @@ int main(int argc, char **argv) {
     return 0;
   }
 
-  std::vector<SoundRealDataClean> trainingDataClean = load_files<CleanTag>();
-  std::vector<SoundRealDataNoisy> trainingDataNoisy = load_files<NoisyTag>(
-      false,
-      std::regex(R"([LR]_[A-Z]{2}_[FM]\d+_[A-Z]{2}\d{3}_a\d{4}_\d+db\.wav)"));
+  const std::vector<SoundRealDataClean> training_data_clean =
+      load_files<CleanTag>();
+  const std::vector<SoundRealDataNoisy> training_data_noisy =
+      load_files<NoisyTag>(
+          false,
+          std::regex(
+              R"([LR]_[A-Z]{2}_[FM]\d+_[A-Z]{2}\d{3}_a\d{4}_\d+db\.wav)"));
 
   // Check for training/using the trained models params for audio output
 
-  std::cout << "Total noisy training segments: " << trainingDataNoisy.size()
+  std::cout << "Total noisy training segments: " << training_data_noisy.size()
             << std::endl;
 
   const auto startTime = std::chrono::high_resolution_clock::now();
-  model.train(trainingDataNoisy, trainingDataClean, pc, 0.01, batchSize, 8);
+
+  for (int i = 0; i < training_data_clean.size(); i++) {
+    std::cout << "clean size: " << training_data_clean[i].sound.size()
+              << std::endl;
+  }
+
+  for (int i = 0; i < training_data_noisy.size(); i++) {
+    std::cout << "noisy size: " << training_data_noisy[i].sound.size()
+              << std::endl;
+  }
+  model.train(training_data_noisy, training_data_clean, pc, 0.05, batchSize, 8);
   const auto endTime = std::chrono::high_resolution_clock::now();
 
   TextFileSaver saver(model_save_path);

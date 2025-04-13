@@ -19,6 +19,7 @@
 
 #include "segment_data.h"
 #include "wav.h"
+#include "load_files.h"
 
 #include <boost/archive/text_iarchive.hpp>
 #include <boost/archive/text_oarchive.hpp>
@@ -29,8 +30,6 @@
 using namespace dynet;
 class Speech_Denoising_Model {
 private:
-  // Parameter p_conv;
-  // Parameter p_reconstruct;
   LookupParameter p_c;
   Parameter p_R;
   Parameter p_bias;
@@ -135,7 +134,6 @@ public:
       std::cerr << "Training data is empty." << std::endl;
       return;
     }
-
     SimpleSGDTrainer trainer(pc, learning_rate);
 
     size_t num_segments = dataSegmentsNoisy.size();
@@ -147,43 +145,36 @@ public:
               << num_segments / static_cast<size_t>(noisy_data_file_count)
               << std::endl;
     std::cout << "Clean batch size: " << num_clean_segments << std::endl;
-    // this means nothing as the batch changes
-    if (!dataSegmentsNoisy.empty() && !dataSegmentsNoisy.back().sound.empty())
-      std::cout << "Single Noisy batch size: "
-                << dataSegmentsNoisy.back().sound.size() << std::endl;
-    if (!dataSegmentsClean.empty() && !dataSegmentsClean.back().sound.empty())
-      std::cout << "Single Clean batch size: "
-                << dataSegmentsClean.back().sound.size() << std::endl;
 
     // Process training mini-batches.
+    // 4 loops
+    // one for segments
+    // two for getting noisy segments into train function
+    // three for iterating to segments into file size params
+
     for (size_t seg_start = 0; seg_start < num_segments;
          seg_start += batch_size) {
       ComputationGraph cg;
       std::vector<real> noisy_batch;
       std::vector<real> clean_batch;
-      unsigned current_batch_size = 0;
 
       size_t seg_end = std::min(seg_start + batch_size, num_segments);
 
-      // Collect noisy data for the batch.
-      for (size_t seg = seg_start; seg < seg_end; ++seg) {
+      // Collect noisy data for the batch.// here we get 8*8 segments but in the right order
+      int i = 0;
+      for (size_t seg = seg_start;  i < batch_size; seg += dataSegmentsNoisy[seg_start].file_segment_count) {
+        // here we get first 8 segments
         noisy_batch.insert(noisy_batch.end(),
                            dataSegmentsNoisy[seg].sound.begin(),
                            dataSegmentsNoisy[seg].sound.end());
-        ++current_batch_size;
+        i++;
       }
 
-      // Collect corresponding clean data.
+      // get batch size amount of segments
       for (size_t seg = seg_start; seg < seg_end; ++seg) {
-        size_t clean_index = seg / static_cast<size_t>(noisy_data_file_count);
-        if (clean_index >= num_clean_segments) {
-          std::cerr << "Error: clean_index " << clean_index << " out of range!"
-                    << std::endl;
-          continue; // Skip if out-of-bounds.
-        }
         clean_batch.insert(clean_batch.end(),
-                           dataSegmentsClean[clean_index].sound.begin(),
-                           dataSegmentsClean[clean_index].sound.end());
+                           dataSegmentsClean[seg].sound.begin(),
+                           dataSegmentsClean[seg].sound.end());
       }
 
       // Ensure both batches have the same size.
@@ -195,7 +186,7 @@ public:
 
       // Build the computation graph for the batch and compute loss.
       Expression loss_expr =
-          buildGraph(cg, noisy_batch, clean_batch, current_batch_size, builder);
+          buildGraph(cg, noisy_batch, clean_batch, batch_size, builder);
       loss = as_scalar(cg.forward(loss_expr));
       cg.backward(loss_expr);
       trainer.update();
@@ -227,7 +218,7 @@ public:
     Expression input_expr = input(cg, input_dim, noisy_batch);
     
     Expression rnn_output = builder.add_input(input_expr);
-    Expression prediction = affine_transform({bias, R, rnn_output});
+    // Expression prediction = affine_transform({bias, R, rnn_output});
 
     return rnn_output;
   }
