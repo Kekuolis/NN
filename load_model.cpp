@@ -66,30 +66,31 @@ void generate_denoised_files(std::regex reg_noisy, const std::string base_path,
 
   ParameterCollection pc;
   // pc.add_parameters({2});
-  
+
   LookupParameter p_c;
-  Parameter p_R;
-  Parameter p_bias;
+  Parameter p_W;
+  Parameter p_out_bias;
 
   TextFileLoader loader("/home/kek/Documents/rudens/praktika/prof_praktika/"
-    "network/param/params.model");
+                        "network/param/params.model");
 
   loader.populate(pc, "/_0");
   loader.populate(pc, "/_1");
   loader.populate(pc, "/_2");
-  p_R = loader.load_param(pc, "/_1");
-  p_bias = loader.load_param(pc, "/_2");
-  p_c = loader.load_lookup_param(pc, "/_0");
+  loader.populate(pc, "/_3");
+  p_W = loader.load_param(pc, "/_0");
+  p_out_bias = loader.load_param(pc, "/_1");
+  // p_c = loader.load_lookup_param(pc, "/_2");
   Speech_Denoising_Model use_model(pc);
   for (int i = 0; i < paths_noisy.size(); i++) {
-    std::cout << "Processing file: " << paths_noisy[i] << std::endl;
-    soundData tmp =
-        use_model.use_model(p_c, p_R, p_bias, paths_noisy[i], batch_size);
+    // std::cout << "Processing file: " << paths_noisy[i] << std::endl;
+    soundData tmp = use_model.use_model(p_W, p_out_bias,
+                                        paths_noisy[i], batch_size);
     std::filesystem::path p(paths_noisy[i]);
 
-  //   writeWavFile("/home/kek/Documents/rudens/praktika/prof_praktika/network/"
-  //                "irasai/TEST/DENOISED/" +
-  //                    p.filename().string(),
-  //                tmp);
+    writeWavFile("/home/kek/Documents/rudens/praktika/prof_praktika/network/"
+                 "irasai/TEST/DENOISED/" +
+                     p.filename().string(),
+                 tmp);
   }
 }

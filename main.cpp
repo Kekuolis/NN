@@ -74,16 +74,7 @@ int main(int argc, char **argv) {
 
   const auto startTime = std::chrono::high_resolution_clock::now();
 
-  for (int i = 0; i < training_data_clean.size(); i++) {
-    std::cout << "clean size: " << training_data_clean[i].sound.size()
-              << std::endl;
-  }
-
-  for (int i = 0; i < training_data_noisy.size(); i++) {
-    std::cout << "noisy size: " << training_data_noisy[i].sound.size()
-              << std::endl;
-  }
-  model.train(training_data_noisy, training_data_clean, pc, 0.05, batchSize, 8);
+  model.train(training_data_noisy, training_data_clean, pc, 0.5, batchSize, 8);
   const auto endTime = std::chrono::high_resolution_clock::now();
 
   TextFileSaver saver(model_save_path);

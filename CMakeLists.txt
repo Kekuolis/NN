@@ -22,4 +22,4 @@ target_link_libraries(my_project PRIVATE
     ${CMAKE_SOURCE_DIR}/dynet/build/dynet/libdynet.so
 )
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEIGEN_STRONG_INLINE=inline -Wno-sign-compare -O2 -fPIC")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DEIGEN_STRONG_INLINE=inline -Wno-sign-compare -fPIC")

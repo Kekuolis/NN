@@ -83,7 +83,7 @@ std::vector<SoundRealData<T>> load_files(bool clean_or_noisy,
   // Iterate through the matched file paths
   for (int i = 0; i < data_paths.size(); i++) {
     const std::string filePath = data_paths[i];
-    std::cout << "Processing file: " << filePath << std::endl;
+    // std::cout << "Processing file: " << filePath << std::endl;
 
     // Check if the file exists
     if (!std::filesystem::exists(filePath)) {
