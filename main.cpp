@@ -2,9 +2,7 @@
 #include "load_files.h"
 #include "load_model.h"
 #include "segment_data.h"
-#include "wav.h"
 #include <iostream>
-#include <iterator>
 #include <vector>
 // Model works
 // Loading params works
@@ -21,9 +19,7 @@
 // write the report - lol
 
 #include <chrono>
-#include <filesystem>
 #include <iostream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -74,7 +70,7 @@ int main(int argc, char **argv) {
 
   const auto startTime = std::chrono::high_resolution_clock::now();
 
-  model.train(training_data_noisy, training_data_clean, pc, 0.5, batchSize, 8);
+  model.train(training_data_noisy, training_data_clean, pc, 0.01, batchSize, 8);
   const auto endTime = std::chrono::high_resolution_clock::now();
 
   TextFileSaver saver(model_save_path);

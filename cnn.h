@@ -30,28 +30,25 @@
 using namespace dynet;
 class Speech_Denoising_Model {
 private:
-  // These parameters represent the output projection:
-  // p_W maps from the hidden state dimension to the output dimension.
   Parameter p_W;
   Parameter p_out_bias;
   unsigned LAYERS;
   unsigned INPUT_DIM;
   uint HIDDEN_SIZE;
+
+  // VanillaLSTMBuilder builder;
   std::vector<int> output_sound;
   bool save;
 
 public:
-  Speech_Denoising_Model(ParameterCollection &pc, unsigned LAYERS = 8,
-                         unsigned INPUT_DIM = 320, uint HIDDEN_SIZE = 8) {
+  Speech_Denoising_Model(ParameterCollection &pc, unsigned LAYERS = 16,
+                         unsigned INPUT_DIM = 320, uint HIDDEN_SIZE = 16) {
 
     this->LAYERS = LAYERS;
     this->INPUT_DIM = INPUT_DIM;
     this->HIDDEN_SIZE = HIDDEN_SIZE;
 
-    // Set up output projection parameters.
-    // p_W should be sized so that when multiplied by a HIDDEN_SIZE vector, it
-    // gives an INPUT_DIM vector.
-    p_W = pc.add_parameters({INPUT_DIM, HIDDEN_SIZE});
+    p_W = pc.add_parameters({INPUT_DIM, HIDDEN_SIZE}); // output projection
     p_out_bias = pc.add_parameters({INPUT_DIM});
   }
 
@@ -75,11 +72,11 @@ public:
   // Compute mean squared error between predicted and target expressions.
   Expression computeMSE(Expression predicted, Expression target, unsigned width,
                         unsigned batch_size) const {
+
     Expression diff = predicted - target;
     Expression sq = square(diff);
     return sum_batches(sum_elems(sq)) / (width * batch_size);
   }
-
   Expression buildGraph(ComputationGraph &cg, std::vector<real> &noisy_batch,
                         std::vector<real> &clean_batch, unsigned batch_size,
                         SimpleRNNBuilder &builder) const {
@@ -89,33 +86,66 @@ public:
       throw std::runtime_error(
           "Noisy and clean batches must have the same size.");
     }
-    // If the data is too short, pad with zeros so that length equals INPUT_DIM
-    // * batch_size.
     while (noisy_batch.size() < INPUT_DIM * batch_size) {
       noisy_batch.push_back(0);
       clean_batch.push_back(0);
     }
-    // Start a new graph sequence.
+
+    // Create a new computation graph and start a new RNN sequence.
     builder.new_graph(cg);
     builder.start_new_sequence();
 
-    // Determine the number of time steps (each time step has INPUT_DIM
-    // features).
-    unsigned width = noisy_batch.size() / INPUT_DIM;
+    // Vectors to store the normalized inputs and the corresponding
+    // normalization parameters.
     std::vector<Expression> inputs;
+    std::vector<Expression> means;
+    std::vector<Expression> stds;
+
+    // Determine the sequence length (number of time steps).
+    unsigned width = noisy_batch.size() / INPUT_DIM;
+
     for (unsigned t = 0; t < width; ++t) {
+      // Extract one timestep sample.
       std::vector<real> timestep_sample(noisy_batch.begin() + t * INPUT_DIM,
                                         noisy_batch.begin() +
                                             (t + 1) * INPUT_DIM);
-      // Create an input Expression for the current time step.
-      Expression x_t =
-          input(cg, {INPUT_DIM}, timestep_sample); // shape: {INPUT_DIM}
-      // Get the hidden state at this time step from the RNN.
-      Expression h_t = builder.add_input(x_t);
-      inputs.push_back(h_t);
-    }
+      // Create input expression.
+      Expression x_t = input(cg, {INPUT_DIM}, timestep_sample);
 
-    // Collect target expressions for each time step.
+      // Compute the mean (scalar) of the timestep.
+      Expression mean_x = mean_elems(x_t);
+
+      // Compute the variance and the standard deviation for x_t.
+      Expression variance_x = mean_elems(square(x_t - mean_x));
+      // Add a small epsilon (1e-8) for numerical stability.
+      Expression std_x = sqrt(variance_x + 1e-8);
+
+      std::vector<real> mean_vals = as_vector(cg.forward(mean_x));
+      std::vector<real> std_vals = as_vector(cg.forward(std_x));
+      // std::cerr << "Timestep " << t << " mean: " << mean_vals[0]
+      //           << ", std: " << std_vals[0] << std::endl;
+
+      // Normalize the current timestep.
+      Expression x_norm = (x_t - mean_x) / std_x;
+
+      // Pass the normalized input to the RNN.
+            // After computing h_t from the RNN:
+      Expression h_t = builder.add_input(x_norm);
+      std::vector<real> h_vals = as_vector(cg.forward(h_t));
+      std::cerr << "Timestep " << t << " RNN output norm: " 
+                << sqrt(std::inner_product(h_vals.begin(), h_vals.end(), h_vals.begin(), 0.0))
+                << std::endl;
+      inputs.push_back(h_t);
+
+      // Save the normalization parameters so they can be used for
+      // denormalization.
+      means.push_back(mean_x);
+      stds.push_back(std_x);
+      
+    }
+    
+
+    // Process the clean batch: no normalization (they remain as targets).
     std::vector<Expression> targets;
     for (unsigned t = 0; t < width; ++t) {
       std::vector<real> timestep_clean(clean_batch.begin() + t * INPUT_DIM,
@@ -125,27 +155,28 @@ public:
       targets.push_back(y_t);
     }
 
-    // Retrieve the learned output projection parameters.
+    // Obtain learnable parameters.
     Expression W = parameter(cg, p_W);
     Expression out_bias = parameter(cg, p_out_bias);
 
     std::vector<Expression> losses;
-    // For each time step, apply an affine transformation to project the hidden
-    // state to the target space. This is where the model can "scale" the hidden
-    // states (which may be in a small range) to values that match your
-    // non-normalized targets.
     for (unsigned t = 0; t < width; ++t) {
-      // Compute the affine transformation:
-      // y_pred = W * h_t + out_bias
-      Expression y_pred = affine_transform({out_bias, W, inputs[t]});
-      // Compute the squared error loss between the prediction and the target.
+      // Instead of using a plain affine_transform on the raw input,
+      // we now use it to predict a normalized output.
+      Expression y_norm_pred = affine_transform({out_bias, W, inputs[t]});
+      // Denormalize the prediction using the mean and std computed from the
+      // noisy input.
+      Expression y_pred = y_norm_pred * stds[t] + means[t];
+
+      // Compute the squared difference between the denormalized output and the
+      // clean target.
       Expression diff = y_pred - targets[t];
       Expression sq = square(diff);
       losses.push_back(sq);
     }
-    // Aggregate the losses over all time steps and average over batch_size.
-    Expression total_loss =
-        sum_batches(sum_elems(concatenate(losses))) / (width * batch_size);
+    // Aggregate the loss over all timesteps.
+    Expression total_loss = sum_batches(sum_elems(concatenate(losses))) / (width * batch_size);
+    std::cerr << "Loss for current batch: " << total_loss.value() << std::endl;
     return total_loss;
   }
 
@@ -174,6 +205,11 @@ public:
     std::cout << "Clean batch size: " << num_clean_segments << std::endl;
 
     // Process training mini-batches.
+    // 4 loops
+    // one for segments
+    // two for getting noisy segments into train function
+    // three for iterating to segments into file size params
+
     for (size_t seg_start = 0; seg_start < num_clean_segments;
          seg_start += batch_size) {
       ComputationGraph cg;
@@ -182,10 +218,12 @@ public:
 
       size_t seg_end = std::min(seg_start + batch_size, num_clean_segments);
 
-      // Build noisy data batches.
+      // Collect noisy data for the batch.// here we get 8*8 segments but in the
+      // right order
       int i = 0;
       for (size_t seg = seg_start; i < batch_size;
            seg += dataSegmentsNoisy[seg_start].file_segment_count) {
+        // here we get first 8 segments
         std::vector<real> tmp;
         for (int j = 0; j < batch_size; j++) {
           tmp.insert(tmp.end(), dataSegmentsNoisy[seg].sound.begin(),
@@ -195,23 +233,22 @@ public:
         i++;
       }
 
-      // Build the clean data batch by concatenating sound vectors.
+      // get batch size amount of segments
       for (size_t seg = seg_start; seg < seg_end; ++seg) {
         clean_batch.insert(clean_batch.end(),
                            dataSegmentsClean[seg].sound.begin(),
                            dataSegmentsClean[seg].sound.end());
       }
 
-      // For each mini-batch, ensure that noisy and clean data have the same
-      // size before building the graph.
+      // Build the computation graph for the batch and compute loss.
       for (int j = 0; j < batch_size; j++) {
+        // Ensure both batches have the same size.
         if (clean_batch.size() > noisy_batch[j].size()) {
           clean_batch.resize(noisy_batch[j].size());
         } else if (noisy_batch[j].size() > clean_batch.size()) {
           noisy_batch[j].resize(clean_batch.size());
         }
 
-        // Build and run the graph.
         Expression loss_expr =
             buildGraph(cg, noisy_batch[j], clean_batch, batch_size, builder);
         loss = as_scalar(cg.forward(loss_expr));
@@ -225,24 +262,18 @@ public:
     std::cout << "INPUT DIM " << INPUT_DIM << std::endl;
     std::cout << "Final Loss: " << loss << std::endl;
   }
-  // Modify load_model to apply the affine transform projection.
   Expression load_model(ComputationGraph &cg, SimpleRNNBuilder &builder,
                         std::vector<real> &noisy_batch, uint batch_size) const {
-    // Get the output projection parameters.
-    // p_W maps from HIDDEN_SIZE to INPUT_DIM, and p_out_bias is the added bias.
     Expression W = parameter(cg, p_W);
     Expression out_bias = parameter(cg, p_out_bias);
 
-    // Start a new computation graph and RNN sequence.
     builder.new_graph(cg);
     builder.start_new_sequence();
 
-    // Ensure we have at least one full frame.
     if (noisy_batch.size() < INPUT_DIM) {
       noisy_batch.resize(INPUT_DIM, 0);
     }
 
-    // Handle partial frame by padding if necessary.
     unsigned width = noisy_batch.size() / INPUT_DIM;
     unsigned remainder = noisy_batch.size() % INPUT_DIM;
     if (remainder != 0) {
@@ -254,15 +285,29 @@ public:
     for (unsigned t = 0; t < width; ++t) {
       std::vector<real> timestep(noisy_batch.begin() + t * INPUT_DIM,
                                  noisy_batch.begin() + (t + 1) * INPUT_DIM);
-      // Create the input expression for this time step.
       Expression x_t = input(cg, {INPUT_DIM}, timestep);
-      // Add the input to the RNN to produce the hidden state.
-      Expression h_t =
-          builder.add_input(x_t); // hidden state vector of size HIDDEN_SIZE
 
-      // Apply the affine transform: project from hidden space to output space.
-      Expression y_t =
-          affine_transform({out_bias, W, h_t}); // now y_t has shape {INPUT_DIM}
+      // === Normalize x_t ===
+      Expression mean_x = mean_elems(x_t); // Compute mean (scalar)
+
+      // Compute variance (mean of squared differences)
+      Expression variance_x = mean_elems(square(x_t - mean_x));
+
+      // Compute standard deviation (sqrt of variance)
+      Expression std_x =
+          sqrt(variance_x + 1e-8); // Add small epsilon for stability
+
+      // Normalize the input (x_t - mean) / std_dev
+      Expression x_norm = (x_t - mean_x) / std_x;
+
+      // === RNN input ===
+      Expression h_t = builder.add_input(x_norm);
+
+      // === Network prediction (still in normalized space) ===
+      Expression y_norm_pred = affine_transform({out_bias, W, h_t});
+
+      // === Denormalize prediction ===
+      Expression y_t = y_norm_pred * std_x + mean_x;
 
       predictions.push_back(y_t);
     }
@@ -271,18 +316,15 @@ public:
       throw std::runtime_error(
           "No predictions were produced. Check your input data.");
     }
-    // Concatenate predictions along the time axis.
-    return concatenate(predictions); // Final shape: {INPUT_DIM * width}
+
+    return concatenate(predictions);
   }
 
-  // Modify use_model to match the new application graph.
   soundData use_model(Parameter &p_W, Parameter &p_out_bias,
                       const std::string &processed_file, uint &batch_size) {
-    // Read the processed audio file.
     soundData data_sound_noisy = readWav(processed_file);
     std::vector<soundData> segments_noisy = segment_data(data_sound_noisy);
 
-    // Set up the parameters from external source.
     ParameterCollection builder_pc;
     this->p_W = p_W;
     this->p_out_bias = p_out_bias;
@@ -295,31 +337,21 @@ public:
       throw std::runtime_error("No segments found in the processed file.");
     }
 
-    // Prepare the output file.
     soundData output_file;
     output_file.headerData = segments_noisy[0].headerData;
 
-    // Create an RNN builder with the same architecture.
     SimpleRNNBuilder builder(LAYERS, INPUT_DIM, HIDDEN_SIZE, builder_pc);
     builder.disable_dropout();
-
-    // Load saved parameters into builder_pc.
     TextFileLoader loader("/home/kek/Documents/rudens/praktika/prof_praktika/"
                           "network/param/params.model");
     loader.populate(builder_pc, "/simple-rnn-builder/");
 
-    // Process each noisy segment.
     for (const auto &segment : segments_noisy) {
       ComputationGraph cg;
-      // Convert the segment to a vector of reals.
       std::vector<real> input_vector = vecToReal(segment.monoSound);
-      // Build the model graph: note that load_model applies the affine
-      // transform.
       Expression output_expr =
           load_model(cg, builder, input_vector, batch_size);
-      // Run the forward pass to get the output.
       std::vector<real> output_vector = as_vector(cg.forward(output_expr));
-      // Append the output for this segment to the output file.
       output_file.monoSound.insert(output_file.monoSound.end(),
                                    output_vector.begin(), output_vector.end());
     }
