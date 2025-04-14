@@ -41,8 +41,8 @@ private:
   bool save;
 
 public:
-  Speech_Denoising_Model(ParameterCollection &pc, unsigned LAYERS = 16,
-                         unsigned INPUT_DIM = 320, uint HIDDEN_SIZE = 16) {
+  Speech_Denoising_Model(ParameterCollection &pc, unsigned LAYERS = 8,
+                         unsigned INPUT_DIM = 320, uint HIDDEN_SIZE = 8) {
 
     this->LAYERS = LAYERS;
     this->INPUT_DIM = INPUT_DIM;
@@ -77,18 +77,30 @@ public:
     Expression sq = square(diff);
     return sum_batches(sum_elems(sq)) / (width * batch_size);
   }
+  // Assume these are computed once and passed to the buildGraph function.
+  real global_noisy_mean;
+  real global_noisy_std;
+  real global_clean_mean;
+  real global_clean_std;
   Expression buildGraph(ComputationGraph &cg, std::vector<real> &noisy_batch,
                         std::vector<real> &clean_batch, unsigned batch_size,
                         SimpleRNNBuilder &builder) const {
 
-    // Ensure that both batches have the same size.
+    // Pad the shorter batch with zeros so they match in size.
     if (noisy_batch.size() != clean_batch.size()) {
-      throw std::runtime_error(
-          "Noisy and clean batches must have the same size.");
+      size_t max_size = std::max(noisy_batch.size(), clean_batch.size());
+      if (noisy_batch.size() < max_size) {
+        noisy_batch.resize(max_size, 0.0f); // Pad with zeros
+      }
+      if (clean_batch.size() < max_size) {
+        clean_batch.resize(max_size, 0.0f); // Pad with zeros
+      }
     }
+
+    // Ensure total input size is at least INPUT_DIM * batch_size
     while (noisy_batch.size() < INPUT_DIM * batch_size) {
-      noisy_batch.push_back(0);
-      clean_batch.push_back(0);
+      noisy_batch.push_back(0.0f);
+      clean_batch.push_back(0.0f);
     }
 
     // Create a new computation graph and start a new RNN sequence.
@@ -129,21 +141,20 @@ public:
       Expression x_norm = (x_t - mean_x) / std_x;
 
       // Pass the normalized input to the RNN.
-            // After computing h_t from the RNN:
+      // After computing h_t from the RNN:
       Expression h_t = builder.add_input(x_norm);
       std::vector<real> h_vals = as_vector(cg.forward(h_t));
-      std::cerr << "Timestep " << t << " RNN output norm: " 
-                << sqrt(std::inner_product(h_vals.begin(), h_vals.end(), h_vals.begin(), 0.0))
-                << std::endl;
+      // std::cerr << "Timestep " << t << " RNN output norm: "
+      //           << sqrt(std::inner_product(h_vals.begin(), h_vals.end(),
+      //           h_vals.begin(), 0.0))
+      //           << std::endl;
       inputs.push_back(h_t);
 
       // Save the normalization parameters so they can be used for
       // denormalization.
       means.push_back(mean_x);
       stds.push_back(std_x);
-      
     }
-    
 
     // Process the clean batch: no normalization (they remain as targets).
     std::vector<Expression> targets;
@@ -175,85 +186,131 @@ public:
       losses.push_back(sq);
     }
     // Aggregate the loss over all timesteps.
-    Expression total_loss = sum_batches(sum_elems(concatenate(losses))) / (width * batch_size);
-    std::cerr << "Loss for current batch: " << total_loss.value() << std::endl;
+    Expression total_loss =
+        sum_batches(sum_elems(concatenate(losses))) / (width * batch_size);
+    // std::cerr << "Loss for current batch: " << total_loss.value() <<
+    // std::endl;
     return total_loss;
   }
 
   // Train the model over multiple epochs using the provided training segments.
-  void train(const std::vector<SoundRealDataNoisy> &dataSegmentsNoisy,
-             const std::vector<SoundRealDataClean> &dataSegmentsClean,
+  void train(const std::vector<SoundRealDataNoisy> &dataNoisy,
+             const std::vector<SoundRealDataClean> &dataClean,
              ParameterCollection &pc, float learning_rate = 0.01,
              unsigned batch_size = 8, int noisy_data_file_count = 8) {
     SimpleRNNBuilder builder(LAYERS, INPUT_DIM, HIDDEN_SIZE, pc);
     builder.disable_dropout();
 
-    if (dataSegmentsNoisy.empty() || dataSegmentsClean.empty()) {
+    if (dataNoisy.empty() || dataClean.empty()) {
       std::cerr << "Training data is empty." << std::endl;
       return;
     }
     SimpleSGDTrainer trainer(pc, learning_rate);
 
-    size_t num_segments = dataSegmentsNoisy.size();
-    size_t num_clean_segments = dataSegmentsClean.size();
+    size_t num_clean = dataClean.size();
     float loss = 0.0f;
 
-    std::cout << "Noisy batch size: " << num_segments << std::endl;
-    std::cout << "Noisy batch size trimmed: "
-              << num_segments / static_cast<size_t>(noisy_data_file_count)
-              << std::endl;
-    std::cout << "Clean batch size: " << num_clean_segments << std::endl;
+    std::cout << "Total clean files: " << num_clean << std::endl;
+    std::cout << "Total noisy files: " << dataNoisy.size() << std::endl;
+    // Process the clean files in batches.
+    for (size_t batch_start = 0; batch_start < dataClean.size();
+         batch_start += batch_size) {
+      // Determine the clean file indices for this batch.
+      size_t batch_end = std::min(batch_start + batch_size, dataClean.size());
 
-    // Process training mini-batches.
-    // 4 loops
-    // one for segments
-    // two for getting noisy segments into train function
-    // three for iterating to segments into file size params
+      // Containers to hold the batch segments.
+      // clean_segments_batch will have one segment (vector<real>) per clean
+      // file in the batch.
+      std::vector<std::vector<real>> clean_segments_batch;
+      // noisy_segments_batch will be a vector (for the batch)
+      // each entry is a vector of 8 noisy segments (each is a vector<real>)
+      // corresponding to one clean file.
+      std::vector<std::vector<std::vector<real>>> noisy_segments_batch;
 
-    for (size_t seg_start = 0; seg_start < num_clean_segments;
-         seg_start += batch_size) {
-      ComputationGraph cg;
-      std::vector<std::vector<real>> noisy_batch;
-      std::vector<real> clean_batch;
-
-      size_t seg_end = std::min(seg_start + batch_size, num_clean_segments);
-
-      // Collect noisy data for the batch.// here we get 8*8 segments but in the
-      // right order
-      int i = 0;
-      for (size_t seg = seg_start; i < batch_size;
-           seg += dataSegmentsNoisy[seg_start].file_segment_count) {
-        // here we get first 8 segments
-        std::vector<real> tmp;
-        for (int j = 0; j < batch_size; j++) {
-          tmp.insert(tmp.end(), dataSegmentsNoisy[seg].sound.begin(),
-                     dataSegmentsNoisy[seg].sound.end());
+      // Collect segmentation data for each clean file in the batch.
+      for (size_t idx = batch_start; idx < batch_end; ++idx) {
+        // Segment the clean data.
+        auto clean_segments = segment_data(dataClean[idx].sound_data);
+        if (clean_segments.empty()) {
+          std::cerr << "Warning: no segmentation found for clean file at index "
+                    << idx << std::endl;
+          continue;
         }
-        noisy_batch.push_back(tmp);
-        i++;
+        // (Select one segment; for instance, the first.)
+        clean_segments_batch.push_back(vecToReal(clean_segments[0].monoSound));
+
+        // Collect corresponding noisy segments.
+        std::vector<std::vector<real>> current_noisy_set;
+        int base = idx * noisy_data_file_count;
+        if (base + noisy_data_file_count > dataNoisy.size()) {
+          std::cerr << "Warning: not enough noisy files for clean index " << idx
+                    << std::endl;
+          continue;
+        }
+        for (int n = 0; n < noisy_data_file_count; n++) {
+          auto noisy_segments = segment_data(dataNoisy[base + n].sound_data);
+          if (noisy_segments.empty()) {
+            std::cerr
+                << "Warning: no segmentation found for noisy file at index "
+                << (base + n) << std::endl;
+            continue;
+          }
+          // (Again, we select the first segment; adjust if needed.)
+          current_noisy_set.push_back(vecToReal(noisy_segments[0].monoSound));
+        }
+        noisy_segments_batch.push_back(current_noisy_set);
       }
 
-      // get batch size amount of segments
-      for (size_t seg = seg_start; seg < seg_end; ++seg) {
-        clean_batch.insert(clean_batch.end(),
-                           dataSegmentsClean[seg].sound.begin(),
-                           dataSegmentsClean[seg].sound.end());
-      }
+      // If the batch turned out empty, skip it.
+      if (clean_segments_batch.empty() || noisy_segments_batch.empty())
+        continue;
 
-      // Build the computation graph for the batch and compute loss.
-      for (int j = 0; j < batch_size; j++) {
-        // Ensure both batches have the same size.
-        if (clean_batch.size() > noisy_batch[j].size()) {
-          clean_batch.resize(noisy_batch[j].size());
-        } else if (noisy_batch[j].size() > clean_batch.size()) {
-          noisy_batch[j].resize(clean_batch.size());
+      // We now iterate over the 8 corresponding noisy segment slots.
+      // For each slot (k=0..noisy_data_file_count-1) we create a mini-batch.
+      for (int k = 0; k < noisy_data_file_count; ++k) {
+        // Flatten the k-th noisy segment from every clean file in this batch
+        // into a single vector.
+        std::vector<real> batch_noisy_flat;
+        // And flatten the corresponding clean segments (one per clean file).
+        std::vector<real> batch_clean_flat;
+        for (size_t i = 0; i < noisy_segments_batch.size(); ++i) {
+          // Sanity-check: we expect each noisy_segments_batch[i] to have
+          // exactly noisy_data_file_count entries.
+          if (k < noisy_segments_batch[i].size()) {
+            // Append all values from the k-th noisy segment.
+            batch_noisy_flat.insert(batch_noisy_flat.end(),
+                                    noisy_segments_batch[i][k].begin(),
+                                    noisy_segments_batch[i][k].end());
+            // Append all values from the clean segment.
+            batch_clean_flat.insert(batch_clean_flat.end(),
+                                    clean_segments_batch[i].begin(),
+                                    clean_segments_batch[i].end());
+          }
         }
 
-        Expression loss_expr =
-            buildGraph(cg, noisy_batch[j], clean_batch, batch_size, builder);
-        loss = as_scalar(cg.forward(loss_expr));
+        // At this point, each flattened vector should be of length:
+        // INPUT_DIM * (# samples in this mini-batch)
+        // The buildGraph function pads if needed, but ideally each segment is
+        // exactly INPUT_DIM.
+        if (batch_noisy_flat.empty() || batch_clean_flat.empty()) {
+          std::cerr << "Warning: empty flattened batch at noisy index " << k
+                    << std::endl;
+          continue;
+        }
+
+        // Build a new computation graph for the mini-batch.
+        ComputationGraph cg;
+        // Use the mini-batch size (number of clean samples in the batch) when
+        // calling buildGraph.
+        Expression loss_expr = buildGraph(
+            cg, batch_noisy_flat, batch_clean_flat,
+            static_cast<unsigned>(noisy_segments_batch.size()), builder);
+
+        // Forward, backward and update.
+        float batch_loss = as_scalar(cg.forward(loss_expr));
         cg.backward(loss_expr);
         trainer.update();
+        loss += batch_loss;
       }
     }
 
