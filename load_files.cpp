@@ -97,7 +97,10 @@ std::vector<SoundRealData<T>> load_files(bool clean_or_noisy,
 
     for (const auto &segment : segments) {
       SoundRealData<T> segment_data;
+      segment_data.file_number = i;
+      segment_data.file_segment_count = segments.size();
       segment_data.sound = vecToReal<int>(segment.monoSound);
+      segment_data.sound_data = segment;
       training_data.push_back(std::move(segment_data));
     }
   }

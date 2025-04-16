@@ -6,7 +6,7 @@ sound
 .vscode
 OpenCNN
 .cache
-dynet**
+dynet
 irasai
 param/eval_func**
 param/output_file.wav
@@ -14,6 +14,8 @@ param/pesq_r**
 param/pesq_w**
 param/output.txt**
 param/params.**
+param**
+param
 
 python_implementation/denoised_output**
 python_implementation/denoised_output_wiener**

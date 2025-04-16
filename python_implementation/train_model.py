@@ -1,0 +1,1 @@
+pip install torch librosa numpy

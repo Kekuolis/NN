@@ -7,8 +7,9 @@
 template <typename SoundType>
 struct SoundRealData {
     std::vector<dynet::real> sound;
-    std::vector<dynet::real> file_number;
+    int file_number;
     int file_segment_count;
+    soundData sound_data;
 };
 using SoundRealDataClean = SoundRealData<struct CleanTag>;
 using SoundRealDataNoisy = SoundRealData<struct NoisyTag>;
